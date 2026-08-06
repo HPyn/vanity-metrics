@@ -17,6 +17,9 @@ param appServicePlanName string = 'AustraliaEastPlan'
 @description('Application Insights component name.')
 param appInsightsName string = 'vanity-metrics-filler'
 
+@description('Globally-unique Key Vault name (3-24 chars, alphanumeric/hyphens).')
+param keyVaultName string = 'vanity-metrics-kv2026'
+
 @allowed(['7.2', '7.4', '7.6'])
 @description('PowerShell worker runtime version. 7.4 reaches EOL 2026-11-10.')
 param powerShellVersion string = '7.6'
@@ -114,6 +117,27 @@ resource appInsightsDailyCap 'Microsoft.Insights/components/pricingPlans@2017-10
   }
 }
 
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: keyVaultName
+  location: location
+  properties: {
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    tenantId: tenant().tenantId
+    accessPolicies: []
+  }
+}
+
+resource githubTokenSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'GithubToken'
+  properties: {
+    value: githubToken
+  }
+}
+
 resource hostingPlan 'Microsoft.Web/serverfarms@2023-01-01' = {
   name: appServicePlanName
   location: location
@@ -135,6 +159,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
   properties: {
     serverFarmId: hostingPlan.id
     httpsOnly: true
+    keyVaultReferenceIdentity: 'SystemAssigned'
     siteConfig: {
       powerShellVersion: powerShellVersion
       minTlsVersion: '1.2'
@@ -167,7 +192,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'GITHUB_TOKEN'
-          value: githubToken
+          value: '@Microsoft.KeyVault(SecretUri=${githubTokenSecret.properties.secretUri})'
         }
         {
           name: 'GITHUB_OWNER'
@@ -219,6 +244,33 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
       ]
     }
+  }
+}
+
+// Lets the Function App's managed identity read secrets from the vault.
+// Uses a Key Vault access policy rather than an Azure RBAC role
+// assignment deliberately: creating a role assignment needs
+// Microsoft.Authorization/roleAssignments/write, which the Contributor
+// role the GitHub OIDC identity deploys with does NOT grant. Access
+// policies are a Key Vault-scoped action Contributor already has, so
+// this deploys without widening that identity's permissions.
+// Split into its own accessPolicies/add resource (rather than a property
+// on the vault itself) to avoid a circular dependency: the vault would
+// need functionApp's principalId, while functionApp needs the vault's
+// secret URI.
+resource keyVaultAccessPolicy 'Microsoft.KeyVault/vaults/accessPolicies@2023-07-01' = {
+  parent: keyVault
+  name: 'add'
+  properties: {
+    accessPolicies: [
+      {
+        tenantId: tenant().tenantId
+        objectId: functionApp.identity.principalId
+        permissions: {
+          secrets: ['get']
+        }
+      }
+    ]
   }
 }
 
