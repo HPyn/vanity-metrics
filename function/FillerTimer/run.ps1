@@ -80,22 +80,38 @@ $headers = @{
     Accept        = 'application/vnd.github+json'
     'User-Agent'  = 'vanity-metrics-filler'
 }
-
-$existing = Invoke-RestMethod -Uri "https://api.github.com/repos/$owner/$repo/contents/$path`?ref=$branch" -Headers $headers -Method Get
-
-$currentContent = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($existing.content))
-$newContent = $currentContent + $filler
-$newContentBase64 = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($newContent))
-
+$getUri = "https://api.github.com/repos/$owner/$repo/contents/$path`?ref=$branch"
+$putUri = "https://api.github.com/repos/$owner/$repo/contents/$path"
 $commitMessage = "chore: automated filler commit ($($now.ToString('yyyy-MM-dd HH:mm')) (Sydney local time)) - see README, this is not real work"
 
-$putBody = @{
-    message = $commitMessage
-    content = $newContentBase64
-    sha     = $existing.sha
-    branch  = $branch
-} | ConvertTo-Json
+# GET-then-PUT against GitHub's contents API is optimistic concurrency on
+# `sha` - if something else writes to $path between our GET and PUT, the
+# PUT 409s. Retry once with a fresh sha rather than crashing the
+# invocation over what's almost always a benign race.
+$maxAttempts = 2
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    $existing = Invoke-RestMethod -Uri $getUri -Headers $headers -Method Get
+    $currentContent = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($existing.content))
+    $newContentBase64 = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($currentContent + $filler))
 
-Invoke-RestMethod -Uri "https://api.github.com/repos/$owner/$repo/contents/$path" -Headers $headers -Method Put -Body $putBody -ContentType 'application/json' | Out-Null
+    $putBody = @{
+        message = $commitMessage
+        content = $newContentBase64
+        sha     = $existing.sha
+        branch  = $branch
+    } | ConvertTo-Json
 
-Write-Information "Committed filler text - week $weekOfYear, multiplier x$multiplier, effective probability $([Math]::Round($effectiveProbability, 3))."
+    try {
+        Invoke-RestMethod -Uri $putUri -Headers $headers -Method Put -Body $putBody -ContentType 'application/json' | Out-Null
+        Write-Information "Committed filler text - week $weekOfYear, multiplier x$multiplier, effective probability $([Math]::Round($effectiveProbability, 3))."
+        break
+    }
+    catch {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        if ($statusCode -eq 409 -and $attempt -lt $maxAttempts) {
+            Write-Information "sha conflict on attempt $attempt (something else wrote $path) - refetching and retrying."
+            continue
+        }
+        throw
+    }
+}
