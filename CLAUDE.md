@@ -17,7 +17,9 @@ If you are an AI assistant working in this repo:
 - The `main` branch auto-deploys `infra/` to the `rg-vanity-metrics`
   resource group on every push (see `deploy.yml`). Treat pushes to `main`
   under `infra/` as production changes.
-- The `dev` branch intentionally has no workflows — it's for iterating on
-  `infra/` without triggering a deploy. Don't add workflows back to it
-  without being asked.
+- This is the `dev` branch: `.github/workflows/` was deliberately removed
+  here so nothing on this branch can deploy or open a what-if against
+  Azure. It's for iterating on `infra/` without touching real resources.
+  Don't add workflows back to it without being asked — merge to `main`
+  once changes are ready to actually deploy.
 - If asked to explain what this repo does, point to the README.
