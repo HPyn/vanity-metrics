@@ -36,8 +36,37 @@ param workStartHour int = 9
 @description('Latest local hour (0-23) the function is allowed to commit.')
 param workEndHour int = 17
 
-@description('Probability (0-1) that a given timer tick produces a commit.')
+@description('Probability (0-1) that a given timer tick produces a commit, before the busy/quiet week multiplier is applied.')
 param commitProbability string = '0.4'
+
+@description('GitHub branch the function commits filler text to.')
+param githubBranch string = 'main'
+
+@description('ISO week-of-year modulo used to decide which weeks look busier or quieter than average.')
+param busyWeekModulo int = 4
+
+@description('Weeks where (ISO week number mod busyWeekModulo) equals this get the busy multiplier.')
+param busyWeekRemainder int = 0
+
+@description('Commit-probability multiplier applied on busy weeks.')
+param busyWeekMultiplier string = '2.5'
+
+@description('Weeks where (ISO week number mod busyWeekModulo) equals this get the quiet multiplier.')
+param quietWeekRemainder int = 2
+
+@description('Commit-probability multiplier applied on quiet weeks.')
+param quietWeekMultiplier string = '0.4'
+
+@description('Monthly cost budget for this resource group, in the subscription\'s billing currency (AUD here). Everything deployed is free-tier, so this exists purely as a tripwire.')
+param budgetAmount int = 2
+
+@description('First day of the month the budget starts tracking from. Must be the 1st; the Consumption Budgets API cannot change this on an existing budget without recreating it.')
+param budgetStartDate string = '2026-08-01'
+
+@description('Emails notified when spend crosses the alert thresholds.')
+param budgetContactEmails array = [
+  'hayden@hp.id.au'
+]
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: storageAccountName
@@ -143,7 +172,59 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           name: 'COMMIT_PROBABILITY'
           value: commitProbability
         }
+        {
+          name: 'GITHUB_BRANCH'
+          value: githubBranch
+        }
+        {
+          name: 'BUSY_WEEK_MODULO'
+          value: string(busyWeekModulo)
+        }
+        {
+          name: 'BUSY_WEEK_REMAINDER'
+          value: string(busyWeekRemainder)
+        }
+        {
+          name: 'BUSY_WEEK_MULTIPLIER'
+          value: busyWeekMultiplier
+        }
+        {
+          name: 'QUIET_WEEK_REMAINDER'
+          value: string(quietWeekRemainder)
+        }
+        {
+          name: 'QUIET_WEEK_MULTIPLIER'
+          value: quietWeekMultiplier
+        }
       ]
+    }
+  }
+}
+
+resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
+  name: 'vanity-metrics-monthly-budget'
+  properties: {
+    category: 'Cost'
+    amount: budgetAmount
+    timeGrain: 'Monthly'
+    timePeriod: {
+      startDate: budgetStartDate
+    }
+    notifications: {
+      actual_GreaterThan_80_Percent: {
+        enabled: true
+        operator: 'GreaterThan'
+        threshold: 80
+        thresholdType: 'Actual'
+        contactEmails: budgetContactEmails
+      }
+      forecasted_GreaterThan_100_Percent: {
+        enabled: true
+        operator: 'GreaterThan'
+        threshold: 100
+        thresholdType: 'Forecasted'
+        contactEmails: budgetContactEmails
+      }
     }
   }
 }
