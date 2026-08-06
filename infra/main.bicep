@@ -36,8 +36,26 @@ param workStartHour int = 9
 @description('Latest local hour (0-23) the function is allowed to commit.')
 param workEndHour int = 17
 
-@description('Probability (0-1) that a given timer tick produces a commit.')
+@description('Probability (0-1) that a given timer tick produces a commit, before the busy/quiet week multiplier is applied.')
 param commitProbability string = '0.4'
+
+@description('GitHub branch the function commits filler text to.')
+param githubBranch string = 'main'
+
+@description('ISO week-of-year modulo used to decide which weeks look busier or quieter than average.')
+param busyWeekModulo int = 4
+
+@description('Weeks where (ISO week number mod busyWeekModulo) equals this get the busy multiplier.')
+param busyWeekRemainder int = 0
+
+@description('Commit-probability multiplier applied on busy weeks.')
+param busyWeekMultiplier string = '2.5'
+
+@description('Weeks where (ISO week number mod busyWeekModulo) equals this get the quiet multiplier.')
+param quietWeekRemainder int = 2
+
+@description('Commit-probability multiplier applied on quiet weeks.')
+param quietWeekMultiplier string = '0.4'
 
 @description('Monthly cost budget for this resource group, in the subscription\'s billing currency (AUD here). Everything deployed is free-tier, so this exists purely as a tripwire.')
 param budgetAmount int = 2
@@ -153,6 +171,30 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'COMMIT_PROBABILITY'
           value: commitProbability
+        }
+        {
+          name: 'GITHUB_BRANCH'
+          value: githubBranch
+        }
+        {
+          name: 'BUSY_WEEK_MODULO'
+          value: string(busyWeekModulo)
+        }
+        {
+          name: 'BUSY_WEEK_REMAINDER'
+          value: string(busyWeekRemainder)
+        }
+        {
+          name: 'BUSY_WEEK_MULTIPLIER'
+          value: busyWeekMultiplier
+        }
+        {
+          name: 'QUIET_WEEK_REMAINDER'
+          value: string(quietWeekRemainder)
+        }
+        {
+          name: 'QUIET_WEEK_MULTIPLIER'
+          value: quietWeekMultiplier
         }
       ]
     }

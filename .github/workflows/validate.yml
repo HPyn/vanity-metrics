@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "infra/**"
+      - "function/**"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/validate.yml"
 
@@ -20,6 +21,21 @@ jobs:
 
       - name: Lint Bicep
         run: az bicep build --file infra/main.bicep --stdout > /dev/null
+
+      - name: Check PowerShell syntax
+        shell: pwsh
+        run: |
+          $hadErrors = $false
+          Get-ChildItem -Path function -Filter *.ps1 -Recurse | ForEach-Object {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $hadErrors = $true
+              Write-Error "Syntax errors in $($_.FullName):"
+              $errors | ForEach-Object { Write-Error $_.Message }
+            }
+          }
+          if ($hadErrors) { exit 1 }
 
       - uses: azure/login@v2
         with:

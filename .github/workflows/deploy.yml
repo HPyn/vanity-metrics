@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "infra/**"
+      - "function/**"
       - ".github/workflows/deploy.yml"
 
 permissions:
@@ -39,3 +40,9 @@ jobs:
           template: infra/main.bicep
           parameters: githubToken=${{ secrets.FUNCTION_GITHUB_TOKEN }}
           deploymentMode: Incremental
+
+      - name: Deploy function code
+        uses: Azure/functions-action@v1
+        with:
+          app-name: vanity-metrics-filler
+          package: function
