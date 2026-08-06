@@ -17,6 +17,10 @@ param appServicePlanName string = 'AustraliaEastPlan'
 @description('Application Insights component name.')
 param appInsightsName string = 'vanity-metrics-filler'
 
+@allowed(['7.2', '7.4', '7.6'])
+@description('PowerShell worker runtime version. 7.4 reaches EOL 2026-11-10.')
+param powerShellVersion string = '7.6'
+
 @secure()
 @description('GitHub PAT the function uses to commit filler text. Pass via a GitHub Actions secret, never hardcode.')
 param githubToken string
@@ -115,7 +119,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
     serverFarmId: hostingPlan.id
     httpsOnly: true
     siteConfig: {
-      powerShellVersion: '7.4'
+      powerShellVersion: powerShellVersion
       minTlsVersion: '1.2'
       ftpsState: 'FtpsOnly'
       use32BitWorkerProcess: true
