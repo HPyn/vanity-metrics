@@ -43,7 +43,21 @@ jobs:
             --mode Incremental
 
       - name: Deploy function code
-        uses: Azure/functions-action@v1
-        with:
-          app-name: vanity-metrics-filler
-          package: function
+        run: |
+          cd function && zip -r ../function.zip . -x ".*" && cd ..
+          # Azure/functions-action sets WEBSITE_RUN_FROM_PACKAGE=1 when it
+          # detects RBAC/OIDC auth, which deploys the zip as a mounted
+          # package rather than extracting it - the PowerShell worker on
+          # Windows Consumption doesn't reliably load from that mount and
+          # fails with "Could not find file ...\wwwroot". Using config-zip
+          # directly (and clearing that setting first, since config-zip
+          # doesn't override it once present) gets a real extract-to-disk
+          # deploy instead.
+          az functionapp config appsettings delete \
+            --name vanity-metrics-filler \
+            --resource-group rg-vanity-metrics \
+            --setting-names WEBSITE_RUN_FROM_PACKAGE || true
+          az functionapp deployment source config-zip \
+            --name vanity-metrics-filler \
+            --resource-group rg-vanity-metrics \
+            --src function.zip

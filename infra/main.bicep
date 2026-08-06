@@ -183,17 +183,6 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           value: toLower(functionAppName)
         }
         {
-          // Azure/functions-action sets this to '1' when it zip-deploys
-          // via RBAC. siteConfig.appSettings here fully replaces the
-          // settings list on every Bicep deploy, so without this the
-          // Bicep step would wipe it out on each deploy, leaving the app
-          // briefly trying to load code from an unpopulated Azure Files
-          // content share until the function-code deploy step (which
-          // runs after) re-added it. Keeping it here removes that window.
-          name: 'WEBSITE_RUN_FROM_PACKAGE'
-          value: '1'
-        }
-        {
           name: 'FUNCTIONS_EXTENSION_VERSION'
           value: '~4'
         }
