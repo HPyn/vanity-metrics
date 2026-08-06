@@ -126,7 +126,11 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
       name: 'standard'
     }
     tenantId: tenant().tenantId
-    accessPolicies: []
+    // Deliberately not setting accessPolicies here (same reasoning as
+    // WEBSITE_RUN_FROM_PACKAGE above): this property is a full replace,
+    // so asserting `[]` would wipe the grant below on every redeploy
+    // until it's re-added moments later. The accessPolicies/add child
+    // resource is the sole source of truth for grants on this vault.
   }
 }
 
@@ -177,6 +181,17 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'WEBSITE_CONTENTSHARE'
           value: toLower(functionAppName)
+        }
+        {
+          // Azure/functions-action sets this to '1' when it zip-deploys
+          // via RBAC. siteConfig.appSettings here fully replaces the
+          // settings list on every Bicep deploy, so without this the
+          // Bicep step would wipe it out on each deploy, leaving the app
+          // briefly trying to load code from an unpopulated Azure Files
+          // content share until the function-code deploy step (which
+          // runs after) re-added it. Keeping it here removes that window.
+          name: 'WEBSITE_RUN_FROM_PACKAGE'
+          value: '1'
         }
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'
