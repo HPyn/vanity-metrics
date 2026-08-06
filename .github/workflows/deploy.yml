@@ -33,11 +33,13 @@ jobs:
         run: az group create --name rg-vanity-metrics --location australiaeast
 
       - name: Deploy Bicep
+        env:
+          GITHUB_TOKEN_PARAM: ${{ secrets.FUNCTION_GITHUB_TOKEN }}
         run: |
           az deployment group create \
             --resource-group rg-vanity-metrics \
             --template-file infra/main.bicep \
-            --parameters githubToken="${{ secrets.FUNCTION_GITHUB_TOKEN }}" \
+            --parameters githubToken="$GITHUB_TOKEN_PARAM" \
             --mode Incremental
 
       - name: Deploy function code

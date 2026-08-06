@@ -34,11 +34,18 @@ param githubRepo string = 'vanity-metrics'
 @description('File the function appends filler text to.')
 param githubPath string = 'log.md'
 
+@minValue(0)
+@maxValue(23)
 @description('Earliest local hour (0-23) the function is allowed to commit.')
 param workStartHour int = 9
 
+@minValue(0)
+@maxValue(23)
 @description('Latest local hour (0-23) the function is allowed to commit.')
 param workEndHour int = 17
+
+@description('Daily ingestion cap (GB) on Application Insights - a hard stop, not just an alert, in case logging ever runs away.')
+param appInsightsDailyCapGb string = '0.1'
 
 @description('Probability (0-1) that a given timer tick produces a commit, before the busy/quiet week multiplier is applied.')
 param commitProbability string = '0.4'
@@ -94,6 +101,16 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   properties: {
     Application_Type: 'web'
     IngestionMode: 'ApplicationInsights'
+  }
+}
+
+resource appInsightsDailyCap 'Microsoft.Insights/components/pricingPlans@2017-10-01' = {
+  parent: appInsights
+  name: 'current'
+  properties: {
+    cap: json(appInsightsDailyCapGb)
+    warningThreshold: 90
+    stopSendNotificationWhenHitCap: false
   }
 }
 
