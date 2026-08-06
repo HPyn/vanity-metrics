@@ -39,6 +39,17 @@ param workEndHour int = 17
 @description('Probability (0-1) that a given timer tick produces a commit.')
 param commitProbability string = '0.4'
 
+@description('Monthly cost budget for this resource group, in the subscription\'s billing currency (AUD here). Everything deployed is free-tier, so this exists purely as a tripwire.')
+param budgetAmount int = 2
+
+@description('First day of the month the budget starts tracking from. Must be the 1st; the Consumption Budgets API cannot change this on an existing budget without recreating it.')
+param budgetStartDate string = '2026-08-01'
+
+@description('Emails notified when spend crosses the alert thresholds.')
+param budgetContactEmails array = [
+  'hayden@hp.id.au'
+]
+
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: storageAccountName
   location: location
@@ -144,6 +155,34 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           value: commitProbability
         }
       ]
+    }
+  }
+}
+
+resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
+  name: 'vanity-metrics-monthly-budget'
+  properties: {
+    category: 'Cost'
+    amount: budgetAmount
+    timeGrain: 'Monthly'
+    timePeriod: {
+      startDate: budgetStartDate
+    }
+    notifications: {
+      actual_GreaterThan_80_Percent: {
+        enabled: true
+        operator: 'GreaterThan'
+        threshold: 80
+        thresholdType: 'Actual'
+        contactEmails: budgetContactEmails
+      }
+      forecasted_GreaterThan_100_Percent: {
+        enabled: true
+        operator: 'GreaterThan'
+        threshold: 100
+        thresholdType: 'Forecasted'
+        contactEmails: budgetContactEmails
+      }
     }
   }
 }
