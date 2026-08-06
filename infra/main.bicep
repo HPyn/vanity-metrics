@@ -126,7 +126,11 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
       name: 'standard'
     }
     tenantId: tenant().tenantId
-    accessPolicies: []
+    // Deliberately not setting accessPolicies here (same reasoning as
+    // WEBSITE_RUN_FROM_PACKAGE above): this property is a full replace,
+    // so asserting `[]` would wipe the grant below on every redeploy
+    // until it's re-added moments later. The accessPolicies/add child
+    // resource is the sole source of truth for grants on this vault.
   }
 }
 
