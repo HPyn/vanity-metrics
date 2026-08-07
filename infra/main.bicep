@@ -126,11 +126,13 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
       name: 'standard'
     }
     tenantId: tenant().tenantId
-    // Deliberately not setting accessPolicies here (same reasoning as
-    // WEBSITE_RUN_FROM_PACKAGE above): this property is a full replace,
-    // so asserting `[]` would wipe the grant below on every redeploy
-    // until it's re-added moments later. The accessPolicies/add child
-    // resource is the sole source of truth for grants on this vault.
+    // Unlike WEBSITE_RUN_FROM_PACKAGE, this one isn't optional to omit:
+    // the Key Vault RP rejects a PUT with no accessPolicies at all
+    // ("The parameter accessPolicies is not specified"), so it has to be
+    // asserted here. `[]` is safe because the accessPolicies/add child
+    // resource below runs immediately after within the same deployment
+    // and re-adds the grant before anything else touches the vault.
+    accessPolicies: []
   }
 }
 
