@@ -63,7 +63,7 @@ param busyWeekModulo int = 4
 param busyWeekRemainder int = 0
 
 @description('Commit-probability multiplier applied on busy weeks.')
-param busyWeekMultiplier string = '2.5'
+param busyWeekMultiplier string = '1.5'
 
 @description('Weeks where (ISO week number mod busyWeekModulo) equals this get the quiet multiplier.')
 param quietWeekRemainder int = 2
