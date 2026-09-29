@@ -1,0 +1,5 @@
+.env
+secrets/
+.tools/
+TestResults.xml
+*.zip
