@@ -1,7 +1,6 @@
 services:
   worker:
-    image: ${VANITY_METRICS_IMAGE:-vanity-metrics:local}
-    build: .
+    image: ${VANITY_METRICS_IMAGE:-ghcr.io/hpyn/vanity-metrics:v2.0.1}
     platform: linux/amd64
     restart: unless-stopped
     init: true
