@@ -32,24 +32,19 @@ The image targets **linux/amd64**. ARM hosts need amd64 emulation; a native ARM
 image is not provided. Keep the host running when you want scheduled commits.
 
 1. Create a folder for the deployment. Download or copy these two files from
-   [the v2.0.0 release](https://github.com/HPyn/vanity-metrics/releases/tag/v2.0.0)
+   [the v2.0.1 release](https://github.com/HPyn/vanity-metrics/releases/tag/v2.0.1)
    into that folder:
 
-   - [compose.yaml](https://github.com/HPyn/vanity-metrics/releases/download/v2.0.0/compose.yaml)
-   - [env.example](https://github.com/HPyn/vanity-metrics/releases/download/v2.0.0/env.example)
+   - [compose.yaml](https://github.com/HPyn/vanity-metrics/releases/download/v2.0.1/compose.yaml)
+   - [env.example](https://github.com/HPyn/vanity-metrics/releases/download/v2.0.1/env.example)
 
    Rename `env.example` to `.env`. You do not need to clone the repository or
    install PowerShell on the host.
 
-2. Open `.env` and replace `VANITY_METRICS_IMAGE=vanity-metrics:local` with:
-
-   ```dotenv
-   VANITY_METRICS_IMAGE=ghcr.io/hpyn/vanity-metrics:v2.0.0
-   ```
-
-   Set `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_BRANCH`, and `GITHUB_PATH` to your
-   target. Keep `DRY_RUN=true` while setting up. The image is publicly available;
-   downloading it does not require a registry login.
+2. Open `.env` and set `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_BRANCH`, and
+   `GITHUB_PATH` to your target. Keep `DRY_RUN=true` while setting up. The files
+   already select the published image; no image setting needs changing.
+   Downloading the image does not require a registry login.
 
 3. In the same deployment folder, create `secrets/github_token.txt`. Leave it
    empty for an offline dry-run.
@@ -91,13 +86,13 @@ the secret as a file; it does not encrypt the source file on your host.
 
 ## Environment settings
 
-Edit these values in `.env`. The downloaded example contains the defaults below,
-except `VANITY_METRICS_IMAGE`, which you must change to the published image as
-shown in the quick start. Keep the token itself in the secret file.
+Edit these values in `.env`. The downloaded example contains the defaults below
+and is already configured to use the published image. Keep the token itself in
+the secret file.
 
 | Variable | Default / deployment value | What it does |
 | --- | --- | --- |
-| `VANITY_METRICS_IMAGE` | `ghcr.io/hpyn/vanity-metrics:v2.0.0` | Selects the published version to download and run. |
+| `VANITY_METRICS_IMAGE` | `ghcr.io/hpyn/vanity-metrics:v2.0.1` | Already set to the published image. Change only to select another version; Compose uses this same default if omitted. |
 | `DRY_RUN` | `true` | Logs decisions without contacting GitHub. Set `false` to enable commits. The explicit `-CheckAccess` command still contacts GitHub. |
 | `GITHUB_OWNER` | `HPyn` | GitHub user or organization that owns the target repository. |
 | `GITHUB_REPO` | `vanity-metrics` | Repository to receive the filler commits. |
@@ -166,5 +161,5 @@ branches and PRs. Publishing a versioned GitHub Release runs the
 it to `ghcr.io/hpyn/vanity-metrics:<release-tag>`. Releases do not automatically
 update running hosts. Filler-only commits trigger neither workflow.
 
-The Docker image is published as `v2.0.0`. The former Azure implementation remains
+The Docker image is published as `v2.0.1`. The former Azure implementation remains
 in Git history. Removing its files does not delete any Azure resources.

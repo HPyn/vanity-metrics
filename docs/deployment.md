@@ -2,19 +2,14 @@
 
 ## Source builds and published images
 
-The default Compose configuration builds the checkout with
-`docker compose up -d --build`. It runs PowerShell 7.6.6 on Ubuntu 24.04 as
+The default Compose configuration downloads the published image. It runs
+PowerShell 7.6.6 on Ubuntu 24.04 as
 UID/GID 10001, with a read-only root filesystem and temporary writable directory.
 There are no exposed ports or persistent application volumes.
 
-After a release has been published successfully, you can deploy with just
-`compose.yaml`, `.env`, and the secret file. Set this in `.env`:
-
-```dotenv
-VANITY_METRICS_IMAGE=ghcr.io/hpyn/vanity-metrics:v2.0.0
-```
-
-Then use the published image:
+Deploy with just the release's `compose.yaml`, `env.example` renamed to `.env`,
+and the secret file. Compose and the example settings already select
+`ghcr.io/hpyn/vanity-metrics:v2.0.1`; no image edit or source checkout is needed:
 
 ```sh
 docker compose pull worker
@@ -25,6 +20,11 @@ No floating `latest` tag is published. Use the image digest when an immutable
 deployment reference is required. To upgrade or roll back a Docker release,
 change the version, pull, and recreate the worker. Do not build locally under a
 published release tag.
+
+For development, clone the repository and build explicitly with
+`docker build --platform linux/amd64 -t vanity-metrics:local .`. Set
+`VANITY_METRICS_IMAGE=vanity-metrics:local` in your local `.env`, then run
+`docker compose up -d --no-build`. The deployment Compose file has no build step.
 
 The owner must make the GHCR package public for anonymous pulls, or users must
 authenticate to GHCR with package-read access. Registry login is separate from
@@ -59,7 +59,7 @@ variables; they do not automatically read `.env`.
 | `BUSY_WEEK_MULTIPLIER` | `2.5` | Nonnegative busy-week multiplier. |
 | `QUIET_WEEK_REMAINDER` | `2` | Distinct remainder identifying quiet weeks. |
 | `QUIET_WEEK_MULTIPLIER` | `0.4` | Nonnegative quiet-week multiplier. |
-| `VANITY_METRICS_IMAGE` | `vanity-metrics:local` | Local build name or published image. |
+| `VANITY_METRICS_IMAGE` | `ghcr.io/hpyn/vanity-metrics:v2.0.1` | Published image, ready to use. Override only for another version or a local development build. |
 
 Remainders must be smaller than the modulo. Probabilities are capped at one after
 multiplication. Numbers use decimal points regardless of host locale.
