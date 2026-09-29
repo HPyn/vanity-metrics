@@ -1,0 +1,42 @@
+services:
+  worker:
+    image: ${VANITY_METRICS_IMAGE:-vanity-metrics:local}
+    build: .
+    platform: linux/amd64
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=128m,mode=1777
+    stop_grace_period: 45s
+    environment:
+      GITHUB_OWNER: ${GITHUB_OWNER:-HPyn}
+      GITHUB_REPO: ${GITHUB_REPO:-vanity-metrics}
+      GITHUB_BRANCH: ${GITHUB_BRANCH:-main}
+      GITHUB_PATH: ${GITHUB_PATH:-log.md}
+      GITHUB_TOKEN_FILE: /run/secrets/github_token
+      DRY_RUN: ${DRY_RUN:-true}
+      TIME_ZONE: ${TIME_ZONE:-Australia/Sydney}
+      WORK_START_HOUR: ${WORK_START_HOUR:-9}
+      WORK_END_HOUR: ${WORK_END_HOUR:-17}
+      INTERVAL_MINUTES: ${INTERVAL_MINUTES:-30}
+      COMMIT_PROBABILITY: ${COMMIT_PROBABILITY:-0.4}
+      BUSY_WEEK_MODULO: ${BUSY_WEEK_MODULO:-4}
+      BUSY_WEEK_REMAINDER: ${BUSY_WEEK_REMAINDER:-0}
+      BUSY_WEEK_MULTIPLIER: ${BUSY_WEEK_MULTIPLIER:-2.5}
+      QUIET_WEEK_REMAINDER: ${QUIET_WEEK_REMAINDER:-2}
+      QUIET_WEEK_MULTIPLIER: ${QUIET_WEEK_MULTIPLIER:-0.4}
+    secrets:
+      - github_token
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"
+
+secrets:
+  github_token:
+    file: ${GITHUB_TOKEN_SOURCE:-./secrets/github_token.txt}

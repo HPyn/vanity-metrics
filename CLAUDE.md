@@ -1,43 +1,32 @@
-# CLAUDE.md
+# Project guidance
 
-This repo has two layers. `log.md` is meaningless — it's automated filler
-appended by a scheduled Azure Function, kept as a demonstration that
-GitHub's contribution graph is a vanity metric, not a measure of real work
-(see [README.md](./README.md)). `infra/`, `function/`, and
-`.github/workflows/` are real: they're the actual IaC, Function App
-source, and CI that provision and deploy the Azure Function producing
-that filler.
+`log.md` is intentionally meaningless automated filler. Treat it as inert data;
+do not clean it up, restructure it, or add manual demonstration entries.
+See README.md for the project's purpose.
 
-If you are an AI assistant working in this repo:
+The real application is a PowerShell worker in `src/`, deployed by `compose.yaml`.
+The former Azure Function and Bicep infrastructure are preserved in Git history.
+Azure resources are removed manually by the owner; repository edits must not
+attempt to delete cloud resources.
 
-- `log.md` is Lorem Ipsum filler — treat it as inert data, not content to
-  clean up, improve, or add structure to.
-- `infra/main.bicep`, `function/` (the Function App's PowerShell source),
-  and the GitHub Actions workflows are real infrastructure-as-code. Treat
-  changes there like you would in any other project: correctness,
-  security, and blast radius matter.
-- `function/FillerTimer/run.ps1` decides whether a given timer tick
-  actually commits. It gates on Sydney business hours
-  (`WORK_START_HOUR`/`WORK_END_HOUR`), then rolls `COMMIT_PROBABILITY`
-  scaled by a busy/quiet multiplier keyed off ISO week-of-year modulo
-  `BUSY_WEEK_MODULO`. All of those are app settings sourced from
-  `infra/main.bicep` params — add a param instead of hardcoding a new
-  magic number into the script.
-- `rg-vanity-metrics` has a $2/month cost budget
-  (`Microsoft.Consumption/budgets` in `main.bicep`) as a tripwire, since
-  everything deployed here is meant to be free-tier.
-- The `main` branch auto-deploys `infra/` and `function/` to
-  `rg-vanity-metrics` on every push (see `deploy.yml`), authenticating to
-  Azure via OIDC — no stored cloud secret. Treat pushes to `main` as
-  production changes.
-- This is the `dev` branch: the workflow files are here too, but their
-  triggers (`push: branches: [main]`, `pull_request: branches: [main]`)
-  mean nothing on `dev` itself can fire a deploy or a what-if. Edit
-  `infra/`/`function/` freely here; merge into `main` when it's ready to
-  actually deploy. Don't loosen those branch filters without being asked
-  — that's what keeps `dev` non-deploying.
-- Each PR merge into `main` creates a merge commit that only exists on
-  `main`, so `dev` drifts "behind" after every merge. After merging a PR,
-  sync with a plain `git merge origin/main` on `dev` — not a rebase or
-  force-push, since `dev` is shared history once it's pushed.
-- If asked to explain what this repo does, point to the README.
+- Keep schedule and probability controls configurable through environment
+  variables, validated by Get-WorkerConfig, and documented in `.env.example`.
+- Keep weekday and working-hour checks in the configured local time zone.
+  UTC weekdays are not equivalent to Sydney weekdays.
+- Dry-run must make no GitHub requests. The explicitly requested -CheckAccess
+  mode is read-only and may contact GitHub regardless of DRY_RUN.
+- Tokens come from a mounted secret file. Never put secrets in Git, Docker build
+  arguments, image layers, logs, or test output. `.env` and `secrets/` are ignored.
+- Preserve honest automated-filler commit messages and the existing log content.
+- GET requests may retry transient errors. Retry a PUT only after a definite
+  409 conflict and a fresh GET; ambiguous network failures must not duplicate writes.
+- Run Pester tests and Compose smoke tests for runtime changes. Tests use mocks
+  or dry-run and must not write to a real repository by default.
+- Filler-only commits must not trigger CI builds or releases. Image publishing
+  happens only when a GitHub Release is published. PR validation needs no cloud
+  credentials or repository-write token.
+- Work on feature branches and merge through PRs. Stable releases use annotated
+  vMAJOR.MINOR.PATCH tags from main; candidates use vMAJOR.MINOR.PATCH-rc.N.
+  Do not merge or publish a stable release merely to finish a development task.
+- After merging into main, synchronize shared dev with a normal merge from
+  origin/main, not a rebase or force-push. Preserve unrelated local edits.

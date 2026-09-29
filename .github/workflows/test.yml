@@ -1,0 +1,56 @@
+name: Test worker
+
+on:
+  push:
+    branches: [main, dev, 'codex/**']
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Dockerfile'
+      - 'compose.yaml'
+      - '.dockerignore'
+      - '.env.example'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Dockerfile'
+      - 'compose.yaml'
+      - '.dockerignore'
+      - '.env.example'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install test dependency
+        shell: pwsh
+        run: Save-Module Pester -RequiredVersion 5.7.1 -Path .tools -Force
+      - name: Unit tests
+        shell: pwsh
+        run: ./tests/Run-Tests.ps1
+      - name: Build container
+        run: docker build --platform linux/amd64 -t vanity-metrics:local .
+      - name: Unit tests in the shipped runtime, offline
+        run: >-
+          docker run --rm --network none --read-only
+          --tmpfs /tmp:rw,nosuid,nodev,size=128m,mode=1777
+          --mount type=bind,src="$PWD",dst=/repo,readonly
+          --entrypoint pwsh vanity-metrics:local
+          -NoLogo -NoProfile -File /repo/tests/Run-Tests.ps1
+      - name: Compose lifecycle tests
+        shell: pwsh
+        run: ./tests/Smoke-Container.ps1

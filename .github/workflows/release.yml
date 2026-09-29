@@ -1,0 +1,68 @@
+name: Publish container release
+
+# Publishing a GitHub Release is the explicit release action. Ordinary commits,
+# including filler commits, can never publish an image.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Validate release tag and main ancestry
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$') {
+            throw 'Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rc.N.'
+          }
+          if ($env:RELEASE_TAG -match '-rc\.' -and $env:RELEASE_PRERELEASE -ne 'true') {
+            throw 'Release candidates must be marked as prereleases.'
+          }
+          if ($env:RELEASE_PRERELEASE -ne 'true') {
+            git merge-base --is-ancestor HEAD origin/main
+            if ($LASTEXITCODE -ne 0) { throw 'Stable releases must come from main history.' }
+          }
+          "IMAGE=ghcr.io/$($env:GITHUB_REPOSITORY.ToLowerInvariant()):$env:RELEASE_TAG" >> $env:GITHUB_ENV
+      - name: Install test dependency
+        shell: pwsh
+        run: Save-Module Pester -RequiredVersion 5.7.1 -Path .tools -Force
+      - name: Unit tests
+        shell: pwsh
+        run: ./tests/Run-Tests.ps1
+      - name: Build release image
+        run: docker build --platform linux/amd64 --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --label "org.opencontainers.image.revision=$GITHUB_SHA" --label "org.opencontainers.image.version=$GITHUB_REF_NAME" -t "$IMAGE" .
+      - name: Unit tests in the shipped runtime, offline
+        run: >-
+          docker run --rm --network none --read-only
+          --tmpfs /tmp:rw,nosuid,nodev,size=128m,mode=1777
+          --mount type=bind,src="$PWD",dst=/repo,readonly
+          --entrypoint pwsh "$IMAGE"
+          -NoLogo -NoProfile -File /repo/tests/Run-Tests.ps1
+      - name: Compose lifecycle tests
+        shell: pwsh
+        run: ./tests/Smoke-Container.ps1 -Image $env:IMAGE
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish tested image
+        run: docker push "$IMAGE"
