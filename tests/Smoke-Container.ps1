@@ -6,7 +6,13 @@ $project = 'vanity-metrics-test-' + [Guid]::NewGuid().ToString('N').Substring(0,
 $invalidContainer = "$project-missing-token"
 $tokenFile = [IO.Path]::GetTempFileName()
 $saved = @{}
-foreach ($key in @('GITHUB_TOKEN_SOURCE', 'VANITY_METRICS_IMAGE', 'DRY_RUN', 'INTERVAL_MINUTES', 'WORK_START_HOUR', 'WORK_END_HOUR', 'COMMIT_PROBABILITY', 'QUIET_WEEK_MULTIPLIER')) {
+# Shell variables override --env-file. In Actions, GITHUB_PATH is a runner file,
+# not our target log path. Isolate every fixture setting from the caller.
+$fixture = @{}
+foreach ($line in Get-Content -LiteralPath (Join-Path $repo '.env.example')) {
+    if ($line -match '^([A-Z_]+)=(.*)$') { $fixture[$Matches[1]] = $Matches[2] }
+}
+foreach ($key in $fixture.Keys) {
     $saved[$key] = [Environment]::GetEnvironmentVariable($key)
 }
 function Invoke-Docker {
@@ -21,6 +27,7 @@ function Require {
 }
 $compose = @('compose', '--project-directory', $repo, '--env-file', (Join-Path $repo '.env.example'), '-p', $project)
 try {
+    foreach ($key in $fixture.Keys) { [Environment]::SetEnvironmentVariable($key, $fixture[$key]) }
     $env:GITHUB_TOKEN_SOURCE = $tokenFile
     $env:VANITY_METRICS_IMAGE = $Image
     $env:DRY_RUN = 'true'
@@ -75,6 +82,10 @@ try {
     & docker run --rm --network none -e INTERVAL_MINUTES=0 $Image -Once
     Require ($LASTEXITCODE -eq 1) 'Invalid configuration must fail with a nonzero exit code.'
     Write-Host 'Container tests passed: Compose startup, health, scheduling, non-root/read-only operation, graceful stop, restart, missing-token health failure, and invalid configuration.'
+}
+catch {
+    & docker @compose logs --no-color --tail 100 | Out-Host
+    throw
 }
 finally {
     & docker rm -f $invalidContainer 2>$null | Out-Null
